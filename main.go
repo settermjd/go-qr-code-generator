@@ -20,8 +20,6 @@ import (
 
 const MAX_UPLOAD_SIZE = 1024 * 1024 // 1MB
 const WATERMARK_WIDTH = 64
-const WATERMARK_FILENAME = "uploads/watermark.png"
-const QRCODE_FILENAME = "data/qrcode.png"
 
 type simpleQRCode struct {
 	Content string
