@@ -102,44 +102,44 @@ func resizeWatermark(watermark io.Reader, width uint) ([]byte, error) {
 	return resized.Bytes(), nil
 }
 
-// uploadWatermarkImage uploads an image file to be used as a watermark for a QR code
-func uploadWatermarkImage(file multipart.File) ([]byte, error) {
+// uploadFile uploads an image file to be used as a watermark for a QR code
+func uploadFile(file multipart.File) ([]byte, error) {
 	buf := bytes.NewBuffer(nil)
 	if _, err := io.Copy(buf, file); err != nil {
-		return nil, fmt.Errorf("could not copy the watermark file into memory: %v", err)
+		return nil, fmt.Errorf("could not upload file. %v", err)
 	}
 
 	return buf.Bytes(), nil
 }
 
-// createErrorResponse is a small utility function to simplify returning a JSON response
+// buildErrorResponse is a small utility function to simplify returning a JSON response
 // to be returned to the user when an error has occurred
-func createErrorResponse(message string) []byte {
-	resp := make(map[string]string)
-	resp["error"] = message
-	jsonResp, err := json.Marshal(resp)
+func buildErrorResponse(message string) []byte {
+	responseData := make(map[string]string)
+	responseData["error"] = message
 
+	response, err := json.Marshal(responseData)
 	if err != nil {
 		log.Fatalln("Could not generate error message.")
 	}
 
-	return jsonResp
+	return response
 }
 
 func handleRequest(writer http.ResponseWriter, request *http.Request) {
 	request.ParseMultipartForm(10 << 20)
-	size := request.FormValue("size")
-	url := request.FormValue("url")
+	var size, url string = request.FormValue("size"), request.FormValue("url")
+	var codeData []byte
 
 	if url == "" {
-		writer.Write(createErrorResponse("Could not determine the desired QR code content."))
+		writer.Write(buildErrorResponse("Could not determine the desired QR code content."))
 		writer.WriteHeader(400)
 		return
 	}
 
 	qrCodeSize, err := strconv.Atoi(size)
 	if err != nil || size == "" {
-		writer.Write(createErrorResponse(fmt.Sprint("Could not determine the desired QR code size:", err)))
+		writer.Write(buildErrorResponse(fmt.Sprint("Could not determine the desired QR code size:", err)))
 		writer.WriteHeader(400)
 		return
 	}
@@ -148,10 +148,10 @@ func handleRequest(writer http.ResponseWriter, request *http.Request) {
 
 	watermarkFile, _, err := request.FormFile("watermark")
 	if err != nil && errors.Is(err, http.ErrMissingFile) {
-		fmt.Println("Error retrieving the uploaded watermark image or no watermark image was uploaded. Error details: ", err)
-		codeData, err := qrCode.Generate()
+		fmt.Println("Watermark image was not uploaded or could not be retrieved. Reason: ", err)
+		codeData, err = qrCode.Generate()
 		if err != nil {
-			writer.Write(createErrorResponse(fmt.Sprintf("Could not generate QR code. %v", err)))
+			writer.Write(buildErrorResponse(fmt.Sprintf("Could not generate QR code. %v", err)))
 			writer.WriteHeader(400)
 			return
 		}
@@ -160,39 +160,38 @@ func handleRequest(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	watermark, err := uploadWatermarkImage(watermarkFile)
+	watermark, err := uploadFile(watermarkFile)
 	if err != nil {
-		writer.Write(createErrorResponse("Could not upload the watermark image."))
+		writer.Write(buildErrorResponse(fmt.Sprint("Could not upload the watermark image.", err)))
 		writer.WriteHeader(400)
 		return
 	}
 
 	contentType := http.DetectContentType(watermark)
 	if err != nil {
-		writer.Write(createErrorResponse(
-			fmt.Sprintf("Provided watermark image is not a PNG image. %v. Content type is: %s", err, contentType)),
-		)
+		response := buildErrorResponse(fmt.Sprintf("Provided watermark image is a %s not a PNG. %v.", err, contentType))
+		writer.Write(response)
 		writer.WriteHeader(400)
 		return
 	}
 
 	watermark, err = resizeWatermark(bytes.NewBuffer(watermark), WATERMARK_WIDTH)
 	if err != nil {
-		writer.Write(createErrorResponse("Could not resize the watermark image."))
+		writer.Write(buildErrorResponse("Could not resize the watermark image."))
 		writer.WriteHeader(400)
 		return
 	}
 
-	fileData, err := qrCode.GenerateWithWatermark(watermark)
+	codeData, err = qrCode.GenerateWithWatermark(watermark)
 	if err != nil {
-		writer.Write(
-			createErrorResponse(
-				fmt.Sprintf("Could not generate QR code with the provided watermark image: %v", err)))
+		response := buildErrorResponse(fmt.Sprintf("Could not generate QR code with the watermark image. %v", err))
+		writer.Write(response)
 		writer.WriteHeader(400)
 		return
 	}
 
-	writer.Write(fileData)
+	writer.Header().Add("Content-Type", "image/png")
+	writer.Write(codeData)
 }
 
 func main() {
