@@ -193,6 +193,12 @@ func handleRequest(writer http.ResponseWriter, request *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/generate", handleRequest)
-	http.ListenAndServe(":8080", nil)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/generate", handleRequest)
+
+	log.Printf("Starting server on %s", ":8080")
+	err := http.ListenAndServe(":8080", mux)
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
