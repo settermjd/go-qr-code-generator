@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"image"
 	"image/draw"
@@ -193,11 +194,14 @@ func handleRequest(writer http.ResponseWriter, request *http.Request) {
 }
 
 func main() {
+	addr := flag.String("addr", ":8080", "HTTP network address")
+	flag.Parse()
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/generate", handleRequest)
 
-	log.Printf("Starting server on %s", ":8080")
-	err := http.ListenAndServe(":8080", mux)
+	log.Printf("Starting server on %s", *addr)
+	err := http.ListenAndServe(*addr, mux)
 	if err != nil {
 		log.Fatalln(err)
 	}
