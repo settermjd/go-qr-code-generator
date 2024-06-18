@@ -166,7 +166,7 @@ func handleRequest(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	contentType := http.DetectContentType(watermark)
-	if err != nil {
+	if contentType != "image/png" {
 		response := buildErrorResponse(fmt.Sprintf("Provided watermark image is a %s not a PNG. %v.", err, contentType))
 		writer.Write(response)
 		writer.WriteHeader(400)
